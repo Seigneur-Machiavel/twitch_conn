@@ -1,0 +1,26 @@
+{
+  "name": "twitch_conn",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Seigneur-Machiavel/twitch_conn.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Seigneur-Machiavel/twitch_conn/issues"
+  },
+  "homepage": "https://github.com/Seigneur-Machiavel/twitch_conn#readme",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1",
+    "tmi.js": "^1.8.5"
+  }
+}

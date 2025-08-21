@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent; /* Important pour OBS */
+  font-family: sans-serif;
+  color: white;
+  overflow: hidden;
+}
+
+#chat {
+  width: 400px;
+  height: 400px;
+  /*overflow-y: auto;*/
+  display: flex;
+  flex-direction: column-reverse; /* Chat du bas vers le haut */
+}
+
+#messages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#messages li {
+  padding: 5px;
+  margin-bottom: 5px;
+  background: rgba(0, 0, 0, 0.5); /* Semi-transparent */
+  border-radius: 5px;
+}
+
+#messages li strong {
+  color: #9146FF; /* Couleur Twitch pour le nom d'utilisateur */
+}
