@@ -19,21 +19,41 @@ class MessagesBox {
 	emitHistoryDelay = 2000;
 	maxLength = 100; // Limite de messages
 	messages = [];
+	cmdMessages = {
+		createNode: [],
+	};
 
-	constructor() { this.loadHistory(); }
+	constructor() {
+		this.#loadMessagesHistory();
+		this.#loadCmdHistory();
+	}
 
-	loadHistory() {
+
+	#loadMessagesHistory() {
 		fs.readFile('messages.json', (err, data) => {
-			if (err) {
-				console.error('Erreur de lecture du fichier :', err);
-				return;
-			}
+			if (err) { console.error('Erreur de lecture du fichier :', err); return; }
 			try { this.messages = JSON.parse(data)?.messages || [];
 			} catch (error) { console.error('Erreur de parsing JSON :', error); }
 		});
 	}
-	saveHistory() {
+	#loadCmdHistory() {
+		fs.readFile('commands.json', (err, data) => {
+			if (err) { console.error('Erreur de lecture du fichier :', err); return; }
+			try { this.cmdMessages = JSON.parse(data)?.commands || {};
+			} catch (error) { console.error('Erreur de parsing JSON :', error); }
+		});
+	}
+	save() {
+		this.#saveHistory();
+		this.#saveCmdHistory();
+	}
+	#saveHistory() {
 		fs.writeFile('messages.json', JSON.stringify({ messages: this.messages }), (err) => {
+			if (err) console.error('Erreur d\'écriture du fichier :', err);
+		});
+	}
+	#saveCmdHistory() {
+		fs.writeFile('commands.json', JSON.stringify({ commands: this.cmdMessages }), (err) => {
 			if (err) console.error('Erreur d\'écriture du fichier :', err);
 		});
 	}
@@ -41,15 +61,28 @@ class MessagesBox {
 		if (message.includes('http')) return; // Ignore les messages avec des liens
 		const msg = { user, message };
 		this.messages.push(msg);
+		this.#digestCmdMessage(user, message);
 		if (this.messages.length > this.maxLength) this.messages.shift();
 		if (emit) this.#emit(msg);
-		this.saveHistory();
+		this.save();
+	}
+	#digestCmdMessage(user, message) {
+		if (message === '!createNode') this.cmdMessages.createNode.push({ user, message });
 	}
 	#emit(msg) {
 		io.emit('chat-message', msg);
 	}
 	emitHistory() {
-		setTimeout(() => this.messages.forEach(msg => io.emit('chat-message', msg)), this.emitHistoryDelay);
+		setTimeout(() => {
+			this.#emitMessagesHistory();
+			this.#emitCmdHistory();
+		}, this.emitHistoryDelay);
+	}
+	#emitMessagesHistory() {
+		this.messages.forEach(msg => io.emit('chat-message', msg));
+	}
+	#emitCmdHistory() {
+		Object.keys(this.cmdMessages).forEach(cmd => this.cmdMessages[cmd].forEach(msg => io.emit('chat-message', msg)));
 	}
 }
 
