@@ -31,14 +31,14 @@ class MessagesBox {
 
 	#loadMessagesHistory() {
 		fs.readFile('messages.json', (err, data) => {
-			if (err) { console.error('Erreur de lecture du fichier :', err); return; }
+			if (err) { console.info('Erreur de lecture du fichier :', err.message); return; }
 			try { this.messages = JSON.parse(data)?.messages || [];
 			} catch (error) { console.error('Erreur de parsing JSON :', error); }
 		});
 	}
 	#loadCmdHistory() {
 		fs.readFile('commands.json', (err, data) => {
-			if (err) { console.error('Erreur de lecture du fichier :', err); return; }
+			if (err) { console.info('Erreur de lecture du fichier :', err.message); return; }
 			try { this.cmdMessages = JSON.parse(data)?.commands || {};
 			} catch (error) { console.error('Erreur de parsing JSON :', error); }
 		});
