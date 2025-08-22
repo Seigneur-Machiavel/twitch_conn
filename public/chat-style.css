@@ -1,7 +1,7 @@
 body {
   margin: 0;
   padding: 0;
-  background: transparent; /* Important pour OBS */
+  background: rgb(51, 51, 51); /* Override by OBS */
   font-family: sans-serif;
   color: white;
   overflow: hidden;

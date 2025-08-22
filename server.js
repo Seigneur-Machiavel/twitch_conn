@@ -1,12 +1,11 @@
 const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const http = require('http');
+const socketIo = require('socket.io');
 const tmi = require('tmi.js');
 const fs = require('fs');
 
-// Options pour la connexion au chat Twitch (anonyme pour lecture seulement)
-const options = {
+//#region TWITCH CHAT OVERLAY
+const options = { // Options pour la connexion au chat Twitch (anonyme pour lecture seulement)
 	options: { debug: true },
 	connection: { reconnect: true },
 	identity: {
@@ -39,6 +38,7 @@ class MessagesBox {
 		});
 	}
 	add(user, message, emit = true) {
+		if (message.includes('http')) return; // Ignore les messages avec des liens
 		const msg = { user, message };
 		this.messages.push(msg);
 		if (this.messages.length > this.maxLength) this.messages.shift();
@@ -53,13 +53,27 @@ class MessagesBox {
 	}
 }
 
-io.on('connection', (socket) => messagesBox.emitHistory()); // resend message history
-
 const messagesBox = new MessagesBox();
 const client = new tmi.client(options);
 client.connect();
 client.on('connected', () => { io.emit('started'); messagesBox.emitHistoryDelay = 100; });
 client.on('message', (channel, tags, message, self) => messagesBox.add(tags.username, message));
-app.use(express.static('public'));
-app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
-http.listen(14597, () => console.log('Serveur lancé sur http://localhost:14597'));
+
+const chatApp = express();
+chatApp.use(express.static('public'));
+chatApp.get('/', (req, res) => res.sendFile(__dirname + '/public/chat-overlay.html'));
+
+const chatOverlayServer = http.createServer(chatApp);
+chatOverlayServer.listen(14597, () => console.log('Serveur lancé sur http://localhost:14597'));
+
+const io = socketIo(chatOverlayServer);
+io.on('connection', (socket) => messagesBox.emitHistory());
+//#endregion
+
+//#region LEGEND OVERLAY
+const legendApp = express();
+legendApp.use(express.static('public'));
+legendApp.get('/', (req, res) => res.sendFile(__dirname + '/public/legend-overlay.html'));
+const legendOverlayServer = http.createServer(legendApp);
+legendOverlayServer.listen(14598, () => console.log('Serveur lancé sur http://localhost:14598'));
+//#endregion
