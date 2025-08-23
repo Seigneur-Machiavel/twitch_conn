@@ -1,8 +1,9 @@
+const fs = require('fs');
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const tmi = require('tmi.js');
-const fs = require('fs');
+const player = require('node-wav-player');
 
 //#region TWITCH CHAT OVERLAY
 const options = { // Options pour la connexion au chat Twitch (anonyme pour lecture seulement)
@@ -15,7 +16,26 @@ const options = { // Options pour la connexion au chat Twitch (anonyme pour lect
 	channels: ['leperroquetrose'] // Ton channel
 };
 
+const commandsAttributes = {
+	'!createnode': { description: 'Créer un nouveau nœud', usage: '!createNode', followersOnly: true }
+}
+
+class SoundBox {
+    /** @param {'message' | 'sub' | 'createnode'} soundId */
+    static async playSound(soundId) {
+        try {
+            // Si le fichier est très petit (< 200KB), on le joue 2 fois
+            const soundPath = `public/sounds/${soundId}.wav`;
+            const stats = fs.statSync(soundPath);
+            const shouldRepeat = stats.size < 200000;
+            const repeatCount = shouldRepeat ? 2 : 1;
+            for (let i = 0; i < repeatCount; i++) await player.play({ path: soundPath, sync: true });
+        } catch (err) { console.error('Erreur lors de la lecture du son:', err.message); }
+    }
+}
+
 class MessagesBox {
+	commandsList = Object.keys(commandsAttributes).map(cmd => cmd.toLowerCase());
 	emitHistoryDelay = 2000;
 	maxLength = 100; // Limite de messages
 	messages = [];
@@ -27,7 +47,6 @@ class MessagesBox {
 		this.#loadMessagesHistory();
 		this.#loadCmdHistory();
 	}
-
 
 	#loadMessagesHistory() {
 		fs.readFile('messages.json', (err, data) => {
@@ -57,40 +76,55 @@ class MessagesBox {
 			if (err) console.error('Erreur d\'écriture du fichier :', err);
 		});
 	}
-	add(user, message, emit = true) {
+	add(tags, message, emit = true) {
 		if (message.includes('http')) return; // Ignore les messages avec des liens
-		const msg = { user, message };
-		this.messages.push(msg);
-		this.#digestCmdMessage(user, message);
+		//const msg = { user: tags.username, message };
+		const { username, subscriber } = tags;
+		// Chose route
+		if (message.startsWith('!')) this.#digestCmdMessage(username, message, emit);
+		else this.#digestChatMessage(username, message, emit);
+		// crop and save
 		if (this.messages.length > this.maxLength) this.messages.shift();
-		if (emit) this.#emit(msg);
 		this.save();
 	}
-	#digestCmdMessage(user, message) {
-		if (message === '!createNode') this.cmdMessages.createNode.push({ user, message });
+	#digestChatMessage(user, message, emit) {
+		SoundBox.playSound('message');
+		this.messages.push({ user, message });
+		if (emit) ioChat.emit('chat-message', { user, message });
 	}
-	#emit(msg) {
-		io.emit('chat-message', msg);
+	#digestCmdMessage(user, message, emit) {
+		const splitted  = message.split(':');
+		const command = splitted[0].trim().toLowerCase();
+		if (!this.commandsList.includes(command)) return;
+
+		// check requirements
+		if (commandsAttributes[command].followersOnly && !this.isUserFollower(user)) {
+			ioCmd.emit('cmd-message', { user, message: 'Vous devez être follower pour utiliser cette commande.' });
+			return;
+		}
+		this.cmdMessages[command].push({ user, message });
+		if (emit) ioCmd.emit('cmd-message', { user, message });
 	}
-	emitHistory() {
+	emitChatHistory() {
+		setTimeout(() => this.messages.forEach(msg => ioChat.emit('chat-message', msg)), this.emitHistoryDelay);
+	}
+	emitCmdHistory() {
 		setTimeout(() => {
-			this.#emitMessagesHistory();
-			this.#emitCmdHistory();
+			Object.keys(this.cmdMessages).forEach(cmd => this.cmdMessages[cmd].forEach(msg => ioCmd.emit('cmd-message', msg)));
 		}, this.emitHistoryDelay);
-	}
-	#emitMessagesHistory() {
-		this.messages.forEach(msg => io.emit('chat-message', msg));
-	}
-	#emitCmdHistory() {
-		Object.keys(this.cmdMessages).forEach(cmd => this.cmdMessages[cmd].forEach(msg => io.emit('chat-message', msg)));
 	}
 }
 
 const messagesBox = new MessagesBox();
 const client = new tmi.client(options);
 client.connect();
-client.on('connected', () => { io.emit('started'); messagesBox.emitHistoryDelay = 100; });
-client.on('message', (channel, tags, message, self) => messagesBox.add(tags.username, message));
+client.on('connected', () => { 
+	ioChat.emit('started');
+	ioCmd.emit('started');
+	messagesBox.emitHistoryDelay = 100;
+});
+client.on('disconnected', () => { ioChat.emit('stopped'); ioCmd.emit('stopped'); });
+client.on('message', (channel, tags, message, self) => messagesBox.add(tags, message));
 
 const chatApp = express();
 chatApp.use(express.static('public'));
@@ -98,15 +132,20 @@ chatApp.get('/', (req, res) => res.sendFile(__dirname + '/public/chat-overlay.ht
 
 const chatOverlayServer = http.createServer(chatApp);
 chatOverlayServer.listen(14597, () => console.log('Serveur lancé sur http://localhost:14597'));
+const ioChat = socketIo(chatOverlayServer);
+ioChat.on('connection', (socket) => messagesBox.emitChatHistory());
 
-const io = socketIo(chatOverlayServer);
-io.on('connection', (socket) => messagesBox.emitHistory());
+const cmdServer = http.createServer(chatApp);
+cmdServer.listen(14598, () => console.log('Serveur lancé sur http://localhost:14598'));
+
+const ioCmd = socketIo(cmdServer);
+ioCmd.on('connection', (socket) => messagesBox.emitCmdHistory());
 //#endregion
 
-//#region LEGEND OVERLAY
-const legendApp = express();
+//#region LEGEND OVERLAY -> Load as HTML in OBS directly
+/*const legendApp = express();
 legendApp.use(express.static('public'));
-legendApp.get('/', (req, res) => res.sendFile(__dirname + '/public/legend-overlay.html'));
+legendApp.get('/', (req, res) => res.sendFile(__dirname + '/public/cmds-overlay.html'));
 const legendOverlayServer = http.createServer(legendApp);
-legendOverlayServer.listen(14598, () => console.log('Serveur lancé sur http://localhost:14598'));
+legendOverlayServer.listen(14599, () => console.log('Serveur lancé sur http://localhost:14599'));*/
 //#endregion

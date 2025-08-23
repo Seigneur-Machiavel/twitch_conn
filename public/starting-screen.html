@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Starting screen</title>
+	<style>
+		body {
+			position: absolute;
+			top: 0;
+			left: 0;
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+			width: 1920px;
+			height: 1080px;
+			font-family: 'IBM Plex Sans', sans-serif;
+		}
+		img {
+			position: absolute;
+		}
+		#centerMsg {
+			margin: 0;
+			position: absolute;
+			text-align: center;
+			width: 100%;
+			top: 75%;
+			transform: translateY(-50%);
+			font-size: 80px;
+			font-weight: bold;
+			color: black;
+		}
+		#centerMsg span:first-child {
+			animation: blink 12s infinite cubic-bezier(.2, 0, .66, 1);
+		}
+		@keyframes blink {
+			0% {
+				opacity: 0;
+			}
+			20% {
+				opacity: 0;
+			}
+			50% {
+				opacity: 1;
+			}
+			94% {
+				opacity: 1;
+			}
+			98% {
+				opacity: 0;
+			}
+			100% {
+				opacity: 0;
+			}
+		}
+		#centerMsg span:last-child {
+			animation: blinkDecayed 12s infinite cubic-bezier(.2, 0, .66, 1);
+		}
+		@keyframes blinkDecayed {
+			0% {
+				opacity: 0;
+			}
+			80% {
+				opacity: 0;
+			}
+			90% {
+				opacity: 1;
+			}
+			95% {
+				opacity: 1;
+			}
+			100% {
+				opacity: 0;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<img src="img/white_contrast_background.png" alt="Starting Screen">
+	<div id="centerMsg"><span>Le stream commence...</span> <span>Bientôt =)</span></div>
+</body>
+
+</html>
