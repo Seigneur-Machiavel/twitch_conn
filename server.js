@@ -40,52 +40,58 @@ class MessagesBox {
 	maxLength = 100; // Limite de messages
 	messages = [];
 	cmdMessages = {
-		createNode: [],
+		'!createnode': [],
 	};
 
 	constructor() {
-		this.#loadMessagesHistory();
-		this.#loadCmdHistory();
+		this.#loadHistory('messages');
+		this.#loadHistory('commands');
+
+		console.log('test')
 	}
 
-	#loadMessagesHistory() {
-		fs.readFile('messages.json', (err, data) => {
-			if (err) { console.info('Erreur de lecture du fichier :', err.message); return; }
-			try { this.messages = JSON.parse(data)?.messages || [];
-			} catch (error) { console.error('Erreur de parsing JSON :', error); }
-		});
-	}
-	#loadCmdHistory() {
-		fs.readFile('commands.json', (err, data) => {
-			if (err) { console.info('Erreur de lecture du fichier :', err.message); return; }
-			try { this.cmdMessages = JSON.parse(data)?.commands || {};
-			} catch (error) { console.error('Erreur de parsing JSON :', error); }
-		});
-	}
 	save() {
-		this.#saveHistory();
-		this.#saveCmdHistory();
-	}
-	#saveHistory() {
-		fs.writeFile('messages.json', JSON.stringify({ messages: this.messages }), (err) => {
-			if (err) console.error('Erreur d\'écriture du fichier :', err);
-		});
-	}
-	#saveCmdHistory() {
-		fs.writeFile('commands.json', JSON.stringify({ commands: this.cmdMessages }), (err) => {
-			if (err) console.error('Erreur d\'écriture du fichier :', err);
-		});
+		this.#saveHistory('messages');
+		this.#saveHistory('commands');
 	}
 	add(tags, message, emit = true) {
 		if (message.includes('http')) return; // Ignore les messages avec des liens
-		//const msg = { user: tags.username, message };
 		const { username, subscriber } = tags;
-		// Chose route
 		if (message.startsWith('!')) this.#digestCmdMessage(username, message, emit);
 		else this.#digestChatMessage(username, message, emit);
-		// crop and save
-		if (this.messages.length > this.maxLength) this.messages.shift();
+		if (this.messages.length > this.maxLength) this.messages.shift(); // crop and save
 		this.save();
+	}
+	emitChatHistory() {
+		setTimeout(() => {
+			//this.messages.forEach(msg => ioChat.emit('chat-message', msg));
+			for (const msg of this.messages)
+				ioChat.emit('chat-message', msg);
+		}, this.emitHistoryDelay);
+	}
+	emitCmdHistory() {
+		setTimeout(() => {
+			for (const cmd of Object.keys(this.cmdMessages))
+				for (const msg of this.cmdMessages[cmd])
+					ioCmd.emit('cmd-message', msg);
+		}, this.emitHistoryDelay);
+	}
+
+	/** @param {'messages' | 'commands'} type */
+	#loadHistory(type) {
+		fs.readFile(type === 'messages' ? 'messages.json' : 'commands.json', (err, data) => {
+			if (err) { console.info('Erreur de lecture du fichier :', err.message); return; }
+			try {
+				if (type === 'messages') this.messages = JSON.parse(data);
+				else this.cmdMessages = JSON.parse(data);
+			} catch (error) { console.error('Erreur de parsing JSON :', error); }
+		});
+	}
+	#saveHistory(type) {
+		const objToSave = type === 'messages' ? this.messages : this.cmdMessages;
+		fs.writeFile(`${type}.json`, JSON.stringify(objToSave), (err) => {
+			if (err) console.error('Erreur d\'écriture du fichier :', err);
+		});
 	}
 	#digestChatMessage(user, message, emit) {
 		SoundBox.playSound('message');
@@ -97,21 +103,10 @@ class MessagesBox {
 		const command = splitted[0].trim().toLowerCase();
 		if (!this.commandsList.includes(command)) return;
 
-		// check requirements
-		if (commandsAttributes[command].followersOnly && !this.isUserFollower(user)) {
-			ioCmd.emit('cmd-message', { user, message: 'Vous devez être follower pour utiliser cette commande.' });
-			return;
-		}
+		// check requirements - aborted for now: we can't check follow without API Auth access
+		//if (commandsAttributes[command]?.followersOnly) {
 		this.cmdMessages[command].push({ user, message });
 		if (emit) ioCmd.emit('cmd-message', { user, message });
-	}
-	emitChatHistory() {
-		setTimeout(() => this.messages.forEach(msg => ioChat.emit('chat-message', msg)), this.emitHistoryDelay);
-	}
-	emitCmdHistory() {
-		setTimeout(() => {
-			Object.keys(this.cmdMessages).forEach(cmd => this.cmdMessages[cmd].forEach(msg => ioCmd.emit('cmd-message', msg)));
-		}, this.emitHistoryDelay);
 	}
 }
 
