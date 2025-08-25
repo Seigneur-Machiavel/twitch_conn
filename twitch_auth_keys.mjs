@@ -3,3 +3,5 @@ export const TWITCH_CONFIG = {
     ACCESS_TOKEN: 'ton_access_token_ici',
     CHANNEL_NAME: 'nom_de_la_chaine'
 };
+
+// TEST
