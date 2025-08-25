@@ -1,5 +1,5 @@
 twitch-auth-keys.mjs
-
+twitch_auth_keys.mjs
 node_modules
 package-lock.json
 messages.json
