@@ -27,7 +27,6 @@ class SoundBox {
 }
 
 class MessagesBox {
-	commandsList = Object.keys(commandsAttributes).map(cmd => cmd.toLowerCase());
 	emitHistoryDelay = 1000;
 	maxLength = 100; // Limite de messages
 	messages = [];

@@ -130,8 +130,8 @@ async function initializeTwitchAuth(tmiClient) {
 	
 	// Configuration des callbacks TwitchAuth
 	await twitchAuth.setupEventSubWebhooks();
-	twitchAuth.setOnError((error) => console.error('🚨 Erreur TwitchAuth:', error.message));
-	twitchAuth.setOnNewFollower((followerData) => {
+	twitchAuth.on('error', (error) => console.error('🚨 Erreur TwitchAuth:', error.message));
+	twitchAuth.on('newFollower', (followerData) => {
 		console.log(`🎉 Nouveau follower détecté: ${followerData.displayName}`);
 		SoundBox.playSound('follow');
 		
