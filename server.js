@@ -4,19 +4,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const tmi = require('tmi.js');
 const player = require('node-wav-player');
-
 //import TwitchAuth from './twitch-auth.mjs';
-
-//#region TWITCH CHAT OVERLAY
-const options = { // Options pour la connexion au chat Twitch (anonyme pour lecture seulement)
-	options: { debug: true },
-	connection: { reconnect: true },
-	identity: {
-		username: 'justinfan12345', // Utilisateur anonyme pour lire le chat
-		password: 'blah' // Mot de passe bidon pour anonyme
-	},
-	channels: ['leperroquetrose'] // Ton channel
-};
+//import { TWITCH_CONFIG } from './twitch-auth-keys.mjs';
 
 const commandsAttributes = {
 	'!createnode': { description: 'Créer un nouveau nœud', usage: '!createNode', followersOnly: true }
@@ -101,13 +90,100 @@ class MessagesBox {
 
 		// check requirements - aborted for now: we can't check follow without API Auth access
 		//if (commandsAttributes[command]?.followersOnly) {
+
+		// Vérifier les prérequis des commandes
+		const cmdAttributes = commandsAttributes[command];
+		if (cmdAttributes?.followersOnly && twitchAuth && !twitchAuth.isFollower(user)) {
+			client.say(TWITCH_CONFIG.CHANNEL_NAME, `@${user}, tu dois être follower pour utiliser cette commande ! 😊`);
+			return;
+		}
+
+		// HANDLE LOCAL COMMANDS
+		this.#handleSpecialCommands(command, user, message);
+
+		// HANDLE DISTANT COMMANDS (sent through API)
 		this.cmdMessages[command].push({ user, message });
 		if (emit) ioCmd.emit('cmd-message', { user, message });
 	}
+
+	#handleSpecialCommands(command, user, message) {
+        switch (command) {
+            case '!followers':
+                if (twitchAuth) {
+                    const count = twitchAuth.getFollowerCount();
+                    client.say(TWITCH_CONFIG.CHANNEL_NAME, `Nous avons actuellement ${count} followers ! 🎉`);
+                }
+                break;
+                
+            case '!uptime':
+                const uptime = process.uptime();
+                const hours = Math.floor(uptime / 3600);
+                const minutes = Math.floor((uptime % 3600) / 60);
+                client.say(TWITCH_CONFIG.CHANNEL_NAME, `Le bot tourne depuis ${hours}h ${minutes}min ! 🤖`);
+                break;
+        }
+    }
 }
 
+//#region TWITCH SETUP
+const tmiOptions = {
+	options: { debug: false },
+	connection: { reconnect: true },
+	identity: {
+		username: TWITCH_CONFIG.CHANNEL_NAME,
+		password: `oauth:${TWITCH_CONFIG.ACCESS_TOKEN}`
+	},
+	channels: [TWITCH_CONFIG.CHANNEL_NAME]
+};
+// Initialisation des instances
 const messagesBox = new MessagesBox();
-const client = new tmi.client(options);
+const client = new tmi.client(tmiOptions);
+const twitchAuth = new TwitchAuth(TWITCH_CONFIG.CLIENT_ID, TWITCH_CONFIG.ACCESS_TOKEN, TWITCH_CONFIG.CHANNEL_NAME);
+
+// Configuration des callbacks TwitchAuth
+twitchAuth.setOnNewFollower((followerData) => {
+    console.log(`🎉 Nouveau follower détecté: ${followerData.displayName}`);
+    
+    // Jouer le son de follow
+    SoundBox.playSound('follow');
+    
+    // Message de bienvenue dans le chat
+    const welcomeMessages = [
+        `Merci pour le follow @${followerData.displayName} ! 🎉`,
+        `Bienvenue dans la famille @${followerData.displayName} ! 💜`,
+        `Un nouveau membre ! Salut @${followerData.displayName} ! 🎊`
+    ];
+    const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+    
+    if (client && client.readyState() === 'OPEN') {
+        client.say(TWITCH_CONFIG.CHANNEL_NAME, randomMessage);
+    }
+    
+    // Émettre vers l'overlay
+    if (ioChat) {
+        ioChat.emit('new-follower', followerData);
+    }
+});
+
+twitchAuth.setOnError((error) => {
+    console.error('🚨 Erreur TwitchAuth:', error.message);
+});
+
+process.on('SIGINT', () => {
+    console.log('\n🛑 Arrêt du bot...');
+    if (twitchAuth) twitchAuth.destroy();
+    if (client) client.disconnect();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Arrêt du bot (SIGTERM)...');
+    if (twitchAuth) twitchAuth.destroy();
+    if (client) client.disconnect();
+    process.exit(0);
+});
+//#endregion
+
 client.connect();
 client.on('connected', () => { 
 	ioChat.emit('started');
