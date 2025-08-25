@@ -5,6 +5,8 @@ const socketIo = require('socket.io');
 const tmi = require('tmi.js');
 const player = require('node-wav-player');
 
+//import TwitchAuth from './twitch-auth.mjs';
+
 //#region TWITCH CHAT OVERLAY
 const options = { // Options pour la connexion au chat Twitch (anonyme pour lecture seulement)
 	options: { debug: true },
@@ -23,13 +25,7 @@ const commandsAttributes = {
 class SoundBox {
     /** @param {'message' | 'sub' | 'createnode'} soundId */
     static async playSound(soundId) {
-        try {
-            // Si le fichier est très petit (< 200KB), on le joue 2 fois
-            const soundPath = `public/sounds/${soundId}.wav`;
-            const stats = fs.statSync(soundPath);
-            const shouldRepeat = stats.size < 200000;
-            const repeatCount = shouldRepeat ? 2 : 1;
-            for (let i = 0; i < repeatCount; i++) await player.play({ path: soundPath, sync: true });
+        try { await player.play({ path: `public/sounds/${soundId}.wav`, sync: true });
         } catch (err) { console.error('Erreur lors de la lecture du son:', err.message); }
     }
 }

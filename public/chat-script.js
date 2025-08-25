@@ -4,7 +4,6 @@ const elements = {
 };
 
 socket.on('started', () => elements.messages.innerHTML = '');
-
 socket.on('chat-message', (data) => {
   const li = document.createElement('li');
   const userName = document.createElement('strong');
