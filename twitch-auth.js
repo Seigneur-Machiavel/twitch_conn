@@ -1,8 +1,3 @@
-/**
- * Module d'authentification et gestion des followers Twitch
- * @author LePerroquetRose
- */
-
 class TwitchAuth {
     constructor(clientId, accessToken, channelName) {
         this.clientId = clientId;
@@ -64,25 +59,113 @@ class TwitchAuth {
 
     async loadInitialFollowers() {
         try {
-            const response = await fetch(`https://api.twitch.tv/helix/channels/followers?broadcaster_id=${this.channelId}&first=100`, {
+            // OPTION 1: Essayer l'endpoint officiel (peut échouer pour les nouvelles apps)
+            let response = await fetch(`https://api.twitch.tv/helix/channels/followers?broadcaster_id=${this.channelId}&first=100`, {
                 headers: this.headers
             });
             
             if (!response.ok) {
+                if (response.status === 403) {
+                    console.warn('⚠️  Accès aux followers refusé (app non autorisée). Utilisation d\'une approche alternative...');
+                    await this.loadFollowersAlternative();
+                    return;
+                } else if (response.status === 401) {
+                    throw new Error('Token d\'accès invalide ou scope manquant (moderator:read:followers requis)');
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
             const data = await response.json();
             
+            // Vérifier si on a des données
+            if (!data.data || data.data.length === 0) {
+                console.warn('⚠️  Aucun follower retourné par l\'API officielle');
+                await this.loadFollowersAlternative();
+                return;
+            }
+            
             data.data.forEach(follower => {
                 this.followers.add(follower.user_login.toLowerCase());
             });
             
-            console.log(`👥 ${this.followers.size} followers chargés initialement`);
+            console.log(`👥 ${this.followers.size} followers chargés via API officielle`);
             this.lastFollowerCheck = new Date();
+            
         } catch (error) {
             console.error('Erreur lors du chargement initial des followers:', error.message);
-            if (this.onError) this.onError(error);
+            await this.loadFollowersAlternative();
+        }
+    }
+	async loadFollowersAlternative() {
+        console.log('🔄 Utilisation du mode follower tracking en temps réel uniquement...');
+        
+        // On ne peut pas charger la liste initiale, mais on peut tracker les nouveaux
+        // En initialisant à 0, les nouveaux follows seront détectés
+        this.followers.clear();
+        this.lastFollowerCheck = new Date();
+        
+        // Optionnel: utiliser une API tierce pour le count (ex: TwitchTracker, StreamElements)
+        try {
+            await this.getFollowerCountFromThirdParty();
+        } catch (err) {
+            console.warn('Impossible d\'obtenir le compte via API tierce');
+        }
+        
+        console.log('✅ Mode détection de nouveaux followers activé');
+    }
+	async getFollowerCountFromThirdParty() {
+        try {
+            // Exemple avec DecAPI (gratuit et public)
+            const response = await fetch(`https://decapi.me/twitch/followcount/${this.channelName}`);
+            if (response.ok) {
+                const count = parseInt(await response.text());
+                if (!isNaN(count)) {
+                    // Simuler des followers pour le comptage (sans les noms)
+                    for (let i = 0; i < count; i++) {
+                        this.followers.add(`follower_${i}`); // Placeholder
+                    }
+                    console.log(`👥 ${count} followers (comptage via DecAPI)`);
+                    return count;
+                }
+            }
+        } catch (err) {
+            console.warn('Erreur DecAPI:', err.message);
+        }
+        return 0;
+    }
+	async setupEventSubWebhooks() {
+        try {
+            // Créer un webhook pour les follows
+            const webhookResponse = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+                method: 'POST',
+                headers: this.headers,
+                body: JSON.stringify({
+                    type: 'channel.follow',
+                    version: '2',
+                    condition: {
+                        broadcaster_user_id: this.channelId,
+                        moderator_user_id: this.channelId // Requis pour v2
+                    },
+                    transport: {
+                        method: 'webhook',
+                        callback: 'https://votre-domaine.com/webhooks/twitch',
+                        secret: 'votre-secret-webhook'
+                    }
+                })
+            });
+
+			const t = await webhookResponse.json();
+
+            if (webhookResponse.ok) {
+                console.log('✅ EventSub webhook configuré pour les follows');
+                return true;
+            } else {
+                console.warn('⚠️  Impossible de configurer EventSub webhook');
+                return false;
+            }
+        } catch (error) {
+            console.error('Erreur EventSub setup:', error.message);
+            return false;
         }
     }
 
@@ -144,8 +227,8 @@ class TwitchAuth {
     }
 
     startFollowerPolling() {
-        this.pollingInterval = setInterval(() => {
-            this.checkNewFollowers();
+        this.pollingInterval = setInterval(async () => {
+            await this.checkNewFollowers();
         }, this.followersCheckInterval);
         
         console.log(`🔄 Polling des followers démarré (toutes les ${this.followersCheckInterval/1000}s)`);

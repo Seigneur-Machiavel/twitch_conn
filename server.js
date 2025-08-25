@@ -123,6 +123,43 @@ class MessagesBox {
     }
 }
 
+let twitchAuth;
+async function initializeTwitchAuth(tmiClient) {
+	twitchAuth = new TwitchAuth(TWITCH_CONFIG.CLIENT_ID, TWITCH_CONFIG.ACCESS_TOKEN, TWITCH_CONFIG.CHANNEL_NAME);
+	await twitchAuth.initialize();
+	
+	// Configuration des callbacks TwitchAuth
+	await twitchAuth.setupEventSubWebhooks();
+	twitchAuth.setOnError((error) => console.error('🚨 Erreur TwitchAuth:', error.message));
+	twitchAuth.setOnNewFollower((followerData) => {
+		console.log(`🎉 Nouveau follower détecté: ${followerData.displayName}`);
+		SoundBox.playSound('follow');
+		
+		const welcomeMessages = [
+			`Merci pour le follow @${followerData.displayName} ! 🎉`,
+			`Bienvenue dans la famille @${followerData.displayName} ! 💜`,
+			`Un nouveau membre ! Salut @${followerData.displayName} ! 🎊`
+		];
+		const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+		if (tmiClient && tmiClient.readyState() === 'OPEN') tmiClient.say(TWITCH_CONFIG.CHANNEL_NAME, randomMessage);
+		if (ioChat) ioChat.emit('new-follower', followerData); // Émettre vers l'overlay
+	});
+	
+	process.on('SIGINT', () => {
+		console.log('\n🛑 Arrêt du bot...');
+		if (twitchAuth) twitchAuth.destroy();
+		if (tmiClient) tmiClient.disconnect();
+		process.exit(0);
+	});
+	
+	process.on('SIGTERM', () => {
+		console.log('\n🛑 Arrêt du bot (SIGTERM)...');
+		if (twitchAuth) twitchAuth.destroy();
+		if (tmiClient) tmiClient.disconnect();
+		process.exit(0);
+	});
+}
+
 //#region TWITCH SETUP
 const tmiOptions = {
 	options: { debug: false },
@@ -136,38 +173,7 @@ const tmiOptions = {
 // Initialisation des instances
 const messagesBox = new MessagesBox();
 const client = new tmi.client(tmiOptions);
-const twitchAuth = new TwitchAuth(TWITCH_CONFIG.CLIENT_ID, TWITCH_CONFIG.ACCESS_TOKEN, TWITCH_CONFIG.CHANNEL_NAME);
-
-// Configuration des callbacks TwitchAuth
-twitchAuth.setOnNewFollower((followerData) => {
-    console.log(`🎉 Nouveau follower détecté: ${followerData.displayName}`);
-    SoundBox.playSound('follow');
-    
-    const welcomeMessages = [
-        `Merci pour le follow @${followerData.displayName} ! 🎉`,
-        `Bienvenue dans la famille @${followerData.displayName} ! 💜`,
-        `Un nouveau membre ! Salut @${followerData.displayName} ! 🎊`
-    ];
-    const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
-    if (client && client.readyState() === 'OPEN') client.say(TWITCH_CONFIG.CHANNEL_NAME, randomMessage);
-    if (ioChat) ioChat.emit('new-follower', followerData); // Émettre vers l'overlay
-});
-
-twitchAuth.setOnError((error) => console.error('🚨 Erreur TwitchAuth:', error.message));
-
-process.on('SIGINT', () => {
-    console.log('\n🛑 Arrêt du bot...');
-    if (twitchAuth) twitchAuth.destroy();
-    if (client) client.disconnect();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    console.log('\n🛑 Arrêt du bot (SIGTERM)...');
-    if (twitchAuth) twitchAuth.destroy();
-    if (client) client.disconnect();
-    process.exit(0);
-});
+initializeTwitchAuth(client);
 //#endregion
 
 client.connect();
