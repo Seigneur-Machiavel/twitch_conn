@@ -2,3 +2,4 @@ node_modules
 package-lock.json
 messages.json
 commands.json
+twitch-auth-keys.mjs
