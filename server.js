@@ -31,8 +31,6 @@ class MessagesBox {
 	constructor() {
 		this.#loadHistory('messages');
 		this.#loadHistory('commands');
-
-		console.log('test')
 	}
 
 	save() {
@@ -143,31 +141,19 @@ const twitchAuth = new TwitchAuth(TWITCH_CONFIG.CLIENT_ID, TWITCH_CONFIG.ACCESS_
 // Configuration des callbacks TwitchAuth
 twitchAuth.setOnNewFollower((followerData) => {
     console.log(`🎉 Nouveau follower détecté: ${followerData.displayName}`);
-    
-    // Jouer le son de follow
     SoundBox.playSound('follow');
     
-    // Message de bienvenue dans le chat
     const welcomeMessages = [
         `Merci pour le follow @${followerData.displayName} ! 🎉`,
         `Bienvenue dans la famille @${followerData.displayName} ! 💜`,
         `Un nouveau membre ! Salut @${followerData.displayName} ! 🎊`
     ];
     const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
-    
-    if (client && client.readyState() === 'OPEN') {
-        client.say(TWITCH_CONFIG.CHANNEL_NAME, randomMessage);
-    }
-    
-    // Émettre vers l'overlay
-    if (ioChat) {
-        ioChat.emit('new-follower', followerData);
-    }
+    if (client && client.readyState() === 'OPEN') client.say(TWITCH_CONFIG.CHANNEL_NAME, randomMessage);
+    if (ioChat) ioChat.emit('new-follower', followerData); // Émettre vers l'overlay
 });
 
-twitchAuth.setOnError((error) => {
-    console.error('🚨 Erreur TwitchAuth:', error.message);
-});
+twitchAuth.setOnError((error) => console.error('🚨 Erreur TwitchAuth:', error.message));
 
 process.on('SIGINT', () => {
     console.log('\n🛑 Arrêt du bot...');
