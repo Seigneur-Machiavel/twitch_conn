@@ -3,7 +3,7 @@
  * @author LePerroquetRose
  */
 
-export class TwitchAuth {
+class TwitchAuth {
     constructor(clientId, accessToken, channelName) {
         this.clientId = clientId;
         this.accessToken = accessToken;
@@ -233,4 +233,4 @@ export class TwitchAuth {
     }
 }
 
-export default TwitchAuth;
+module.exports = TwitchAuth;

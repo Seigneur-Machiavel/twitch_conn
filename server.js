@@ -4,8 +4,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const tmi = require('tmi.js');
 const player = require('node-wav-player');
-//import TwitchAuth from './twitch-auth.mjs';
-//import { TWITCH_CONFIG } from './twitch-auth-keys.mjs';
+const TwitchAuth = require('./twitch-auth.js');
+const TWITCH_CONFIG = require('./twitch-auth-keys.js');
 
 const commandsAttributes = {
 	'!createnode': { description: 'Créer un nouveau nœud', usage: '!createNode', followersOnly: true }
