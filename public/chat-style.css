@@ -24,7 +24,7 @@ body {
 #messages li {
   padding: 5px;
   margin-bottom: 5px;
-  background: rgba(0, 0, 0, 0.5); /* Semi-transparent */
+  background: rgba(0, 0, 0, .9);
   border-radius: 5px;
 }
 

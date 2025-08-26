@@ -18,7 +18,6 @@ const options = { // Options pour la connexion au chat Twitch (anonyme pour lect
 	channels: ['leperroquetrose'] // Ton channel
 };
 
-
 class SoundBox {
     static async playSound(soundId = 'toto') {
         try { await player.play({ path: `public/sounds/${soundId}.wav`, sync: true });
