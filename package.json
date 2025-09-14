@@ -21,7 +21,9 @@
   "dependencies": {
     "express": "^5.1.0",
     "node-wav-player": "^1.0.0",
+    "open": "^10.2.0",
     "socket.io": "^4.8.1",
-    "tmi.js": "^1.8.5"
+    "tmi.js": "^1.8.5",
+    "url": "^0.11.4"
   }
 }

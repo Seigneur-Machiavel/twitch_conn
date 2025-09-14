@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Focus Mode Overlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: transparent;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #focus-overlay {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            background: rgb(0, 0, 0);
+            color: #fff;
+            padding: 20px 50px;
+            border-radius: 12px;
+            border: 2px solid #9146ff;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            opacity: 0;
+            transform: translate(-50%, -100%);
+            transition: all 0.3s ease;
+            z-index: 9999;
+        }
+
+        #focus-overlay.active {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        .focus-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #9146ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .focus-timer {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+        }
+
+        .focus-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 15px auto 5px;
+        }
+
+        .focus-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #9146ff, #ff6b6b);
+            border-radius: 2px;
+            transition: width 1s linear;
+        }
+
+        .focus-status {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .focus-timer.ending {
+            animation: pulse 1s infinite;
+            color: #ff6b6b;
+        }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="focus-overlay">
+        <div class="focus-title">Focus Mode</div>
+        <div class="focus-timer" id="timer">00:00</div>
+        <div class="focus-progress">
+            <div class="focus-progress-bar" id="progress"></div>
+        </div>
+        <div class="focus-status" id="status">En pause</div>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:14598');
+        const overlay = document.getElementById('focus-overlay');
+        const timer = document.getElementById('timer');
+        const progress = document.getElementById('progress');
+        const status = document.getElementById('status');
+        
+        let updateInterval = null;
+        let currentStatus = null;
+
+        socket.on('focus-status', (focusStatus) => {
+            currentStatus = focusStatus;
+            updateDisplay(focusStatus);
+        });
+
+        function updateDisplay(focusStatus) {
+            if (!focusStatus.active) {
+                overlay.classList.remove('active');
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                }
+                return;
+            }
+
+            overlay.classList.add('active');
+            
+            if (updateInterval) clearInterval(updateInterval);
+            
+            updateInterval = setInterval(() => {
+                if (!currentStatus?.active) return;
+                
+                const now = Date.now();
+                const remaining = Math.max(0, currentStatus.endTime - now);
+                const totalSeconds = Math.floor(remaining / 1000);
+                
+                if (totalSeconds <= 0) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    return;
+                }
+                
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                const elapsed = currentStatus.duration - remaining;
+                const progressPercent = (elapsed / currentStatus.duration) * 100;
+                
+                timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                progress.style.width = `${progressPercent}%`;
+                
+                // Animation pour les dernières 30 secondes
+                if (totalSeconds <= 30) {
+                    timer.classList.add('ending');
+                    status.textContent = 'Fin imminente !';
+                } else {
+                    timer.classList.remove('ending');
+                    status.textContent = 'En cours...';
+                }
+            }, 100);
+        }
+
+        socket.on('connect', () => console.log('Focus overlay connecté'));
+        socket.on('disconnect', () => console.log('Focus overlay déconnecté'));
+    </script>
+</body>
+</html>
