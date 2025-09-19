@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const tmi = require('tmi.js');
-const TWITCH_CONFIG = require('./twitch-auth-keys.js');
+const TWITCH_CONFIG = require('./auth-keys.js');
 const MessagesBox = require('./MessagesBox.js');
 const TwitchAuth = require('./twitch-auth.js');
 const TwitchEventSub = require('./twitchEventSub.js');
@@ -63,7 +63,6 @@ app.get('/focus', (req, res) => res.sendFile(__dirname + '/public/focus-control.
 	const cmdServer = http.createServer(app);
 	cmdServer.listen(14598, () => console.log('Command server: http://localhost:14598'));
 	const ioCmd = socketIo(cmdServer);
-	const focusManager = new FocusManager(ioCmd);
 	ioCmd.on('connection', (socket) => {
 		messagesBox.emitCmdHistory();
 		for (const username of Object.keys(twitchAuth.followers))
@@ -72,7 +71,6 @@ app.get('/focus', (req, res) => res.sendFile(__dirname + '/public/focus-control.
 		socket.emit('focus-status', focusManager.getStatus());
 		socket.on('focus-start', (data) => {
 			if (!data.minutes || data.minutes <= 0) return;
-			messagesBox.mute();
 			
 			const success = focusManager.start(data.minutes);
 			if (success) console.log(`Focus ${data.minutes}min activé`);
@@ -81,13 +79,13 @@ app.get('/focus', (req, res) => res.sendFile(__dirname + '/public/focus-control.
 
 		socket.on('focus-stop', () => {
 			const success = focusManager.stop();
-			messagesBox.unmute();
 			console.log(success ? 'Focus arrêté' : 'Pas de focus actif');
 		});
 	});
 	// Setup onAddFollower callback
 	twitchAuth.onAddFollower = (followInfo) => ioCmd.emit('cmd-message', { user: 'bot', message: `!addFollower:${followInfo.user_name}` });
 	const messagesBox = new MessagesBox(tmiClient, ioChat, ioCmd, twitchAuth);
+	const focusManager = new FocusManager(ioCmd, messagesBox);
 
 	function destroyClients() { twitchAuth?.destroy(); tmiClient?.disconnect(); }
 	process.on('SIGTERM', () => { destroyClients(); process.exit(0); });

@@ -1,11 +1,16 @@
+
+
 class FocusManager {
+	messageBox = null;
     #activeTimer = null;
     #endTime = null;
     #duration = null;
     #io = null;
-    
-    constructor(io) {
+
+	/** @param {import("./MessagesBox.js")} messageBox */
+    constructor(io, messageBox) {
         this.#io = io;
+		this.messageBox = messageBox;
     }
     
     start(minutes) {
@@ -17,6 +22,7 @@ class FocusManager {
         
         this.#activeTimer = setTimeout(() => this.#onComplete(), this.#duration);
         this.#broadcast();
+		this.messageBox?.mute();
         return true;
     }
     
@@ -25,6 +31,7 @@ class FocusManager {
         
         this.#clear();
         this.#broadcast();
+        this.messageBox?.unmute();
         return true;
     }
     
@@ -56,6 +63,7 @@ class FocusManager {
     #onComplete() {
         this.#clear();
         this.#broadcast();
+		this.messageBox?.unmute();
         console.log('Focus mode terminé !');
     }
     
